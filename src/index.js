@@ -1,7 +1,8 @@
 const express = require('express'); 
 const pool = require('./db');       
 const app = express();              
-app.use(express.json()); // Middleware must be at the top
+app.use(express.json()); 
+const bcrypt = require('bcrypt');
 
 const port = process.env.PORT || 3000; 
 
@@ -38,22 +39,24 @@ app.get('/jobs', async (req, res) => {
   }
 });
 
-// Door 4: Register users (Now standing on its own!)
+// Door 4: Register users 
 app.post('/register', async (req, res) => {
   try {
-    // 1. Pull all 5 pieces of data from the Postman Body
-    const { full_name, email, password, role, city } = req.body; 
+    const { full_name, email, password, role, city } = req.body;
 
-    // 2. Map all 5 pieces to the SQL query
+    // 1. Generate a salt and hash the password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // 2. Insert the HASHED password into the database
     const newUser = await pool.query(
-      'INSERT INTO users (full_name, email, password_hash, role, city) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [full_name, email, password, role, city] 
+      'INSERT INTO users (full_name, email, password_hash, role, city) VALUES ($1, $2, $3, $4, $5) RETURNING id, full_name, email',
+      [full_name, email, hashedPassword, role, city]
     );
 
-    res.status(201).json(newUser.rows[0]); 
+    res.status(201).json(newUser.rows[0]);
   } catch (err) {
-    // This will tell you EXACTLY which column is causing trouble in the terminal
-    console.error('Registration Error:', err.message); 
+    console.error(err.message);
     res.status(500).send('Registration failed');
   }
 });
